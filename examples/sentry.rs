@@ -57,12 +57,12 @@ struct TaskMetrics {
 impl task_group::Metrics for TaskMetrics {
     fn task_started(&self, id: TaskId, name: String) {
         let c = self.count.fetch_add(1, Ordering::Relaxed);
-        trace!("TASK+ | {} total | {} | id: {}", c + 1, name, id)
+        println!("TASK+ | {} total | {} | id: {}", c + 1, name, id)
     }
 
     fn task_stopped(&self, id: TaskId, name: String) {
         let c = self.count.fetch_sub(1, Ordering::Relaxed);
-        trace!("TASK- | {} total | {} | id: {}", c - 1, name, id)
+        println!("TASK- | {} total | {} | id: {}", c - 1, name, id)
     }
 }
 
@@ -105,7 +105,7 @@ impl CapabilityServerImpl {
 impl CapabilityServer for CapabilityServerImpl {
     #[instrument(skip(self, peer), fields(peer=&*peer.to_string()))]
     fn on_peer_connect(&self, peer: PeerId, caps: HashMap<CapabilityName, CapabilityVersion>) {
-        info!("Settting up peer state");
+        println!("Settting up peer state");
         let status_message = StatusMessage {
             protocol_version: *caps.get(&eth()).unwrap(),
             network_id: 1,
@@ -149,7 +149,7 @@ impl CapabilityServer for CapabilityServerImpl {
                 self.teardown(peer);
             }
             InboundEvent::Message { message, .. } => {
-                info!(
+                println!(
                     "Received message with id {}, data {}",
                     message.id,
                     hex::encode(&message.data)
@@ -158,10 +158,10 @@ impl CapabilityServer for CapabilityServerImpl {
                 if message.id == 0 {
                     match rlp::decode::<StatusMessage>(&message.data) {
                         Ok(v) => {
-                            info!("Decoded status message: {:?}", v);
+                            println!("Decoded status message: {:?}", v);
                         }
                         Err(e) => {
-                            info!("Failed to decode status message: {}! Kicking peer.", e);
+                            println!("Failed to decode status message: {}! Kicking peer.", e);
                             let _ = self
                                 .get_pipes(peer)
                                 .sender
@@ -210,7 +210,7 @@ impl CapabilityServer for CapabilityServerImpl {
                 reason: DisconnectReason::DisconnectRequested,
             });
 
-        info!("Sending outbound event {:?}", outbound);
+        println!("Sending outbound event {:?}", outbound);
 
         outbound
     }
@@ -218,6 +218,8 @@ impl CapabilityServer for CapabilityServerImpl {
 
 #[tokio::main]
 async fn main() {
+    use tracing_subscriber::filter::LevelFilter;
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
@@ -277,6 +279,6 @@ async fn main() {
 
     loop {
         sleep(std::time::Duration::from_secs(5)).await;
-        info!("Peers: {}.", swarm.connected_peers());
+        println!("Peers: {}.", swarm.connected_peers());
     }
 }

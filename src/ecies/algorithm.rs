@@ -24,6 +24,9 @@ use sha2::Sha256;
 use sha3::Keccak256;
 use std::convert::TryFrom;
 
+use hex_literal::hex;
+
+
 const PROTOCOL_VERSION: usize = 4;
 
 fn ecdh_x(public_key: &PublicKey, secret_key: &SecretKey) -> H256 {
@@ -123,8 +126,13 @@ impl ECIES {
     }
 
     pub fn new_client(secret_key: SecretKey, remote_id: PeerId) -> Result<Self, ECIESError> {
-        let nonce = H256::random();
-        let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        // let nonce = H256::random();
+        // let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+
+        // Should be generated randomly
+        let nonce = H256(hex!("09267e7d55aada87e46468b2838cc616f084394d6d600714b58ad7a3a2c0c870"));
+        // Epheremal private key (should be random)
+        let ephemeral_secret_key = SecretKey::from_slice(&hex::decode("691bb7a2fd6647eae78a235b9d305d09f796fe8e8ce7a18aa1aa1deff9649a02").unwrap()).unwrap();
 
         Self::new_static_client(secret_key, remote_id, nonce, ephemeral_secret_key)
     }
@@ -162,8 +170,11 @@ impl ECIES {
     }
 
     pub fn new_server(secret_key: SecretKey) -> Result<Self, ECIESError> {
-        let nonce = H256::random();
-        let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        //let nonce = H256::random();
+        //let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+
+        let nonce = H256::from([0_u8; 32]);
+        let ephemeral_secret_key = SecretKey::from_slice(&[2_u8; 32]).unwrap();
 
         Self::new_static_server(secret_key, nonce, ephemeral_secret_key)
     }
@@ -254,12 +265,13 @@ impl ECIES {
         out.append(&PROTOCOL_VERSION);
 
         let mut out = out.out();
-        out.resize(out.len() + thread_rng().gen_range(100..=300), 0);
+        //out.resize(out.len() + thread_rng().gen_range(100..=300), 0);
+        out.resize(out.len() + 100, 0);
         out
     }
 
-    #[cfg(test)]
-    fn create_auth(&mut self) -> BytesMut {
+    // #[cfg(test)]
+    pub fn create_auth(&mut self) -> BytesMut {
         let mut buf = BytesMut::new();
         self.write_auth(&mut buf);
         buf
@@ -303,6 +315,7 @@ impl ECIES {
             .next()
             .ok_or(rlp::DecoderError::RlpInvalidLength)?
             .as_val()?;
+
         self.remote_id = Some(remote_id);
         self.remote_public_key = Some(id2pk(remote_id).context("failed to parse peer id")?);
         self.remote_nonce = Some(
@@ -310,7 +323,6 @@ impl ECIES {
                 .ok_or(rlp::DecoderError::RlpInvalidLength)?
                 .as_val()?,
         );
-
         let x = ecdh_x(&self.remote_public_key.unwrap(), &self.secret_key);
         self.remote_ephemeral_public_key = Some(SECP256K1.recover(
             &secp256k1::Message::from_slice((x ^ self.remote_nonce.unwrap()).as_ref()).unwrap(),
@@ -338,7 +350,7 @@ impl ECIES {
         out.out()
     }
 
-    #[cfg(test)]
+    // #[cfg(test)]
     pub fn create_ack(&mut self) -> BytesMut {
         let mut buf = BytesMut::new();
         self.write_ack(&mut buf);
@@ -381,11 +393,11 @@ impl ECIES {
                 .ok_or(rlp::DecoderError::RlpInvalidLength)?
                 .as_val()?,
         );
-
         self.ephemeral_shared_secret = Some(ecdh_x(
             &self.remote_ephemeral_public_key.unwrap(),
             &self.ephemeral_secret_key,
         ));
+
         Ok(())
     }
 
@@ -424,6 +436,7 @@ impl ECIES {
             hasher.update(shared_secret.as_ref());
             H256::from(hasher.finalize().as_ref())
         };
+
         self.ingress_aes = Some(Aes256Ctr::new(
             aes_secret.as_ref().into(),
             iv.as_ref().into(),
@@ -459,8 +472,8 @@ impl ECIES {
             .update(self.init_msg.as_ref().unwrap());
     }
 
-    #[cfg(test)]
-    fn create_header(&mut self, size: usize) -> BytesMut {
+    // #[cfg(test)]
+    pub fn create_header(&mut self, size: usize) -> BytesMut {
         let mut out = BytesMut::new();
         self.write_header(&mut out, size);
         out
@@ -485,6 +498,7 @@ impl ECIES {
 
     pub fn read_header(&mut self, data: &mut [u8]) -> Result<usize, ECIESError> {
         let (header_bytes, mac_bytes) = data.split_at_mut(16);
+
         let mut header = HeaderBytes::from_mut_slice(header_bytes);
         let mac = H128::from_slice(&mac_bytes[..16]);
 
@@ -516,8 +530,8 @@ impl ECIES {
         }) + 16
     }
 
-    #[cfg(test)]
-    fn create_body(&mut self, data: &[u8]) -> BytesMut {
+    //#[cfg(test)]
+    pub fn create_body(&mut self, data: &[u8]) -> BytesMut {
         let mut out = BytesMut::new();
         self.write_body(&mut out, data);
         out
