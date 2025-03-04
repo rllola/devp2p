@@ -91,7 +91,7 @@ pub struct ECIES {
 }
 
 impl ECIES {
-    fn new_static_client(
+    pub fn new_static_client(
         secret_key: SecretKey,
         remote_id: PeerId,
         nonce: H256,
@@ -126,13 +126,8 @@ impl ECIES {
     }
 
     pub fn new_client(secret_key: SecretKey, remote_id: PeerId) -> Result<Self, ECIESError> {
-        // let nonce = H256::random();
-        // let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
-
-        // Should be generated randomly
-        let nonce = H256(hex!("09267e7d55aada87e46468b2838cc616f084394d6d600714b58ad7a3a2c0c870"));
-        // Epheremal private key (should be random)
-        let ephemeral_secret_key = SecretKey::from_slice(&hex::decode("691bb7a2fd6647eae78a235b9d305d09f796fe8e8ce7a18aa1aa1deff9649a02").unwrap()).unwrap();
+        let nonce = H256::random();
+        let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
 
         Self::new_static_client(secret_key, remote_id, nonce, ephemeral_secret_key)
     }
@@ -170,11 +165,8 @@ impl ECIES {
     }
 
     pub fn new_server(secret_key: SecretKey) -> Result<Self, ECIESError> {
-        //let nonce = H256::random();
-        //let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
-
-        let nonce = H256::from([0_u8; 32]);
-        let ephemeral_secret_key = SecretKey::from_slice(&[2_u8; 32]).unwrap();
+        let nonce = H256::random();
+        let ephemeral_secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
 
         Self::new_static_server(secret_key, nonce, ephemeral_secret_key)
     }
